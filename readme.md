@@ -15,4 +15,7 @@ $ node index.js (run express API service )
 
 ```
 $ http://localhost:2043/
+
+$initial will can product and promo list API
+
 ```
