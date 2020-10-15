@@ -1,0 +1,615 @@
+
+<html>
+	<head>
+		<title>Check Out</title>
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+		<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular.min.js"></script>
+		<script src="http://momentjs.com/downloads/moment.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.11.0/underscore-min.js"></script>
+
+		<!-- Bootstrap 3 -->
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+		<style>
+			* { margin: 0; padding: 0; box-sizing: border-box; }
+			body { font: 13px Helvetica, Arial; }
+			form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
+			form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
+			form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
+			#messages { list-style-type: none; margin: 0; padding: 0; }
+			#messages li { padding: 5px 10px; }
+			#messages li:nth-child(odd) { background: #eee; }
+			#messages { margin-bottom: 40px }
+
+			.panel {
+				margin-bottom: 20px;
+				background-color: #fff;
+				border: 1px solid transparent;
+				border-radius: 4px;
+				-webkit-box-shadow: 0 1px 1px rgba(0,0,0,.05);
+				box-shadow: 0 1px 1px rgba(0,0,0,.05);
+			}
+			.product-list img{
+			    width: 100%;
+			    border-radius: 4px 4px 0 0;
+			    -webkit-border-radius: 4px 4px 0 0;
+			}
+
+			.product-list .pro-img-box {
+			    position: relative;
+			}
+			.adtocart {
+				background: #fc5959;
+				width: 50px;
+				height: 50px;
+				border-radius: 50%;
+				-webkit-border-radius: 50%;
+				color: #fff;
+				display: inline-block;
+				text-align: center;
+				border: 3px solid #fff;
+				left: 45%;
+				bottom: -25px;
+				position: absolute;
+			}
+			.panel-body {
+				padding: 15px;
+			}
+			.pro-title {
+				color: #5A5A5A;
+				display: inline-block;
+				margin-top: 20px;
+				font-size: 16px;
+			}
+	</style>
+
+	</head>
+
+	<script>
+	angular.module("app",[])
+	.provider("api", function () {
+		this.$get = ["$http", function ($http) {
+			var that = this;
+			var defaultResponseReject = function (resp) {
+				return resp.data;
+			}
+			return {
+				getProduct: function (params,data) {
+					return $http({
+						method: 'get',
+						url: '//localhost:2043/api/product/list',
+						params: params,
+						data : data
+					})
+					.then(defaultResponseReject, defaultResponseReject);
+				},
+				getPromo: function (params,data) {
+					return $http({
+						method: 'get',
+						url: '//localhost:2043/api/product/getPromo',
+						params: params,
+						data : data
+					})
+					.then(defaultResponseReject, defaultResponseReject);
+				},
+			};
+		}];
+	})
+	.controller("AppController", ["$scope","$timeout","$window","$interval" ,"api", function ($scope,$timeout,$window,$interval,api) {
+		$scope.show          = "productlist";
+		$scope.productlist   = [];
+		$scope.cartlist      = {};
+		$scope.cartsize      = 0;
+		$scope.sum           = 0;
+		$scope.ori           = 0;
+		$scope.applied       = false;
+		$scope.minus_number  = 0;
+		$scope.applied_code  = '';
+		$scope.model         = {
+			promocode :'',
+		};
+		$scope.codelist      = [];
+
+
+		$scope.getProductList = function(){
+			api.getProduct()
+			.then(function(resp){
+				// console.log(resp)
+				if(resp.errorMessage)
+					return console.log(resp.errorMessage)
+				$scope.productlist = resp.data;
+			});
+		}
+
+		$scope.getPromo = function(){
+			api.getPromo()
+			.then(function(resp){
+				// console.log(resp)
+				if(resp.errorMessage)
+					return console.log(resp.errorMessage)
+				$scope.promocodelist = resp.data;
+
+				_.each(resp.data, function(v,k){
+					$scope.codelist.push(v.id)
+				});
+
+				// console.log($scope.codelist)
+			});
+		}
+
+		$scope.init = function(){
+			$scope.show          = "productlist";
+			$scope.getProductList();
+			$scope.getPromo();
+		}
+
+
+		$scope.goto = function(o){
+			$scope.show = o;
+			$scope.remvoecode();
+		}
+
+		$scope.addTocart = function(i){
+			$scope.cartlist[i.id] = i ;
+			$scope.cartsize = _.size($scope.cartlist);
+			// console.log($scope.cartlist)
+			$scope.coutPrice();
+		}
+
+		$scope.removeTocart = function(i){
+			delete $scope.cartlist[i.id];
+			$scope.cartsize = _.size($scope.cartlist);
+			$scope.coutPrice();
+		}
+
+		$scope.removecart = function(){
+			_.each($scope.cartlist, function(v,k){
+				$scope.cartlist[v.id].num = 0;
+			});
+			$scope.cartlist= {};
+			$scope.cartsize = _.size($scope.cartlist);
+			$scope.coutPrice();
+		}
+
+		$scope.minus = function(i){
+			$scope.cartlist[i.id].num -= 1;
+			if($scope.cartlist[i.id].num <= 0){
+				delete $scope.cartlist[i.id];
+				$scope.cartsize = _.size($scope.cartlist);
+			}
+			$scope.coutPrice();
+		}
+
+		$scope.add = function(i){
+			$scope.addTocart(i);
+			$scope.cartlist[i.id].num += 1;
+			$scope.coutPrice();
+		}
+
+		$scope.round = function(amount) {
+			return Math.round(amount*100)/100;
+		}
+
+		$scope.remvoecode = function() {
+			$scope.applied          = false;
+			$scope.applied_code     = '';
+			$scope.model.promocode  = '';
+			$scope.sum              = $scope.ori;
+		}
+
+		// $scope.apply = function() {
+		// 	console.log($scope.cartlist['form'])
+		// 	var p = $scope.model.promocode;
+		// 	if(p.length == 0 )
+		// 		return alert("PROMO CODE cannot be empty");
+		// 	var index = $scope.codelist.indexOf($scope.model.promocode);
+
+		// 	if(index==-1)
+		// 		alert("Invalid PROMO CODE")
+
+		// 	if(p == "RRD4D32"){
+		// 		if($scope.ori >= 1000){
+		// 			$scope.minus_number = $scope.round($scope.ori*0.1);
+		// 			$scope.sum          = $scope.ori - $scope.minus_number;
+		// 			$scope.applied      = true;
+		// 			$scope.applied_code = p;
+		// 		}else{
+		// 			$scope.remvoecode();
+		// 			alert("Does not meet the minimum requirements")
+		// 		}
+		// 	}
+
+		// 	if(p == "44F4T11"){
+		// 		if($scope.ori >= 1500){
+		// 			$scope.minus_number = $scope.round($scope.ori*0.15);
+		// 			$scope.sum          = $scope.ori - $scope.minus_number;
+		// 			$scope.applied      = true;
+		// 			$scope.applied_code = p;
+		// 		}else{
+		// 			$scope.remvoecode();
+		// 			alert("Does not meet the minimum requirements")
+		// 		}
+		// 	}
+
+		// 	if(p == "FF9543D1"){
+
+		// 		if(!_.isUndefined($scope.cartlist['docgen'])){
+		// 			if($scope.cartlist['docgen'].num >=10){
+		// 				// $scope.minus_number = $scope.round($scope.ori*0.15);
+		// 				$scope.applied      = true;
+		// 				$scope.applied_code = p;
+
+		// 				var sum = 0;
+
+		// 				_.each($scope.cartlist, function(v,k){
+		// 					if(v.id=="docgen"){
+		// 						sum = sum + (8.99 * v.num );
+		// 					}else{
+		// 						sum = sum + (v.price * v.num );
+		// 					}
+		// 				});
+		// 				$scope.sum =  $scope.round(sum);
+		// 				$scope.minus_number = $scope.ori - $scope.sum;
+
+
+		// 			}else{
+		// 				$scope.remvoecode();
+		// 				alert("Does not meet the minimum requirements")
+		// 			}
+		// 		}else{
+		// 			$scope.remvoecode();
+		// 			alert("Does not meet the minimum requirements")
+		// 		}
+		// 	}
+
+		// 	if(p == "YYGWKJD"){
+
+		// 		if(!_.isUndefined($scope.cartlist['wf']) && !_.isUndefined($scope.cartlist['form'])){
+		// 			if($scope.cartlist['wf'].num >=1){
+		// 				// $scope.minus_number = $scope.round($scope.ori*0.15);
+		// 				$scope.applied      = true;
+		// 				$scope.applied_code = p;
+
+		// 				var sum = 0;
+
+		// 				_.each($scope.cartlist, function(v,k){
+		// 					if(v.id=="form"){
+		// 						sum = sum + (89.99 * v.num );
+		// 					}else{
+		// 						sum = sum + (v.price * v.num );
+		// 					}
+		// 				});
+		// 				$scope.sum =  $scope.round(sum);
+		// 				$scope.minus_number = $scope.ori - $scope.sum;
+
+
+		// 			}else{
+		// 				$scope.remvoecode();
+		// 				alert("Does not meet the minimum requirements")
+		// 			}
+		// 		}else{
+		// 			$scope.remvoecode();
+		// 			alert("Does not meet the minimum requirements")
+		// 		}
+		// 	}
+
+		// 	$scope.model.promocode = '';
+		// }
+
+		// $scope.apply2 = function() {
+		// 	if($scope.applied_code == "RRD4D32"){
+		// 		if($scope.ori >= 1000){
+		// 			$scope.minus_number = $scope.round($scope.ori*0.1);
+		// 			$scope.sum          = $scope.ori - $scope.minus_number;
+		// 		}else{
+		// 			$scope.remvoecode();
+		// 			alert("Does not meet the minimum requirements")
+		// 		}
+		// 	}
+
+		// 	if($scope.applied_code == "44F4T11"){
+		// 		if($scope.ori >= 1500){
+		// 			$scope.minus_number = $scope.round($scope.ori*0.15);
+		// 			$scope.sum          = $scope.ori - $scope.minus_number;
+		// 		}else{
+		// 			$scope.remvoecode();
+		// 			alert("Does not meet the minimum requirements");
+		// 		}
+		// 	}
+
+		// 	if($scope.applied_code ==  "FF9543D1"){
+
+		// 		if(!_.isUndefined($scope.cartlist['docgen'])){
+		// 			if($scope.cartlist['docgen'].num >=10){
+		// 				var sum = 0;
+
+		// 				_.each($scope.cartlist, function(v,k){
+		// 					if(v.id=="docgen"){
+		// 						sum = sum + (8.99 * v.num );
+		// 					}else{
+		// 						sum = sum + (v.price * v.num );
+		// 					}
+		// 				});
+		// 				$scope.sum =  $scope.round(sum);
+		// 				$scope.minus_number = $scope.ori - $scope.sum;
+
+
+		// 			}else{
+		// 				$scope.remvoecode();
+		// 				alert("Does not meet the minimum requirements")
+		// 			}
+		// 		}else{
+		// 			$scope.remvoecode();
+		// 			alert("Does not meet the minimum requirements")
+		// 		}
+		// 	}
+
+
+		// 	if($scope.applied_code == "YYGWKJD"){
+
+		// 		if(!_.isUndefined($scope.cartlist['wf']) && !_.isUndefined($scope.cartlist['form'])){
+		// 			if($scope.cartlist['wf'].num >=1){
+		// 				var sum = 0;
+
+		// 				_.each($scope.cartlist, function(v,k){
+		// 					if(v.id=="form"){
+		// 						sum = sum + (89.99 * v.num );
+		// 					}else{
+		// 						sum = sum + (v.price * v.num );
+		// 					}
+		// 				});
+		// 				$scope.sum =  $scope.round(sum);
+		// 				$scope.minus_number = $scope.ori - $scope.sum;
+
+
+		// 			}else{
+		// 				$scope.remvoecode();
+		// 				alert("Does not meet the minimum requirements")
+		// 			}
+		// 		}else{
+		// 			$scope.remvoecode();
+		// 			alert("Does not meet the minimum requirements")
+		// 		}
+		// 	}
+		// }
+
+		$scope.apply = function() {
+			var p = $scope.model.promocode;
+			if(p.length == 0 )
+				return alert("PROMO CODE cannot be empty");
+
+			var f = _.find($scope.promocodelist, function(v,k){
+				return v.id == p;
+			});
+
+			if(_.isUndefined(f))
+				return alert("Invalid PROMO CODE")
+
+			if(f.apply_to=="all"){
+				if($scope.ori >= f.min){
+					if(f.discount=="percentage")
+						$scope.minus_number = $scope.round($scope.ori*f.discount_amt);
+					$scope.sum          = $scope.ori - $scope.minus_number;
+					$scope.applied      = true;
+					$scope.applied_code = p;
+					$scope.sum = $scope.round($scope.sum);
+				}else{
+					$scope.remvoecode();
+					alert("Does not meet the minimum requirements")
+				}
+			}
+
+			if(f.apply_to!="all"){
+
+				if(!_.isUndefined($scope.cartlist[f.apply_to]) && !_.isUndefined($scope.cartlist[f.min_code])){
+					if($scope.cartlist[f.min_code].num >= f.min){
+						// $scope.minus_number = $scope.round($scope.ori*0.15);
+						$scope.applied      = true;
+						$scope.applied_code = p;
+
+						var sum = 0;
+
+						_.each($scope.cartlist, function(v,k){
+							if(v.id==f.apply_to){
+								if(f.discount=="fix")
+								sum = sum + (f.discount_amt * v.num );
+							}else{
+								sum = sum + (v.price * v.num );
+							}
+						});
+						$scope.sum =  $scope.round(sum);
+						$scope.minus_number = $scope.ori - $scope.sum;
+
+
+					}else{
+						$scope.remvoecode();
+						alert("Does not meet the minimum requirements")
+					}
+				}else{
+					$scope.remvoecode();
+					alert("Does not meet the minimum requirements")
+				}
+			}
+
+			$scope.model.promocode = '';
+		}
+
+		$scope.apply2 = function() {
+
+			var f = _.find($scope.promocodelist, function(v,k){
+				return v.id == $scope.applied_code;
+			});
+
+			if(_.isUndefined(f))
+				return alert("Invalid PROMO CODE");
+
+
+			if(f.apply_to=="all"){
+				if($scope.ori >= f.min){
+					if(f.discount=="percentage")
+						$scope.minus_number = $scope.round($scope.ori*f.discount_amt);
+					$scope.sum          = $scope.ori - $scope.minus_number;
+					$scope.sum = $scope.round($scope.sum);
+				}else{
+					$scope.remvoecode();
+					alert("Does not meet the minimum requirements")
+				}
+			}
+
+			if(f.apply_to!="all"){
+
+				if(!_.isUndefined($scope.cartlist[f.apply_to]) && !_.isUndefined($scope.cartlist[f.min_code])){
+					if($scope.cartlist[f.min_code].num >= f.min){
+						var sum = 0;
+
+						_.each($scope.cartlist, function(v,k){
+							if(v.id==f.apply_to){
+								if(f.discount=="fix")
+									sum = sum + (f.discount_amt * v.num );
+							}else{
+								sum = sum + (v.price * v.num );
+							}
+							// console.log(sum)
+						});
+						$scope.sum =  $scope.round(sum);
+						$scope.minus_number = $scope.ori - $scope.sum;
+
+
+					}else{
+						$scope.remvoecode();
+						alert("Does not meet the minimum requirements")
+					}
+				}else{
+					$scope.remvoecode();
+					alert("Does not meet the minimum requirements")
+				}
+			}
+		}
+
+
+		$scope.coutPrice = function(){
+			var sum = 0;
+			if(_.size($scope.cartlist)==0)
+				$scope.ori= 0;
+			else{
+				_.each($scope.cartlist, function(v,k){
+					sum = sum + (v.price * v.num );
+				});
+
+				$scope.ori = $scope.round(sum) ;
+
+			}
+
+			if($scope.applied)
+				$scope.apply2();
+
+			// console.log($scope.sum)
+		}
+
+	}]);
+</script>
+
+	<body ng-app="app" ng-controller="AppController" ng-init="init()" class="container">
+
+		<div class="col-12">
+			<h1>
+				<span ng-if="show=='productlist' ">Product</span>
+				<span ng-if="show=='cart' ">Shopping Cart</span>
+				<button ng-click="goto('productlist')" class="btn btn-sm" ng-class="{'btn-info':show == 'productlist'}">Main</button>
+				<!-- <button ng-click="goto('cart')" class="btn btn-sm " ng-class="{'btn-info': show == 'cart'}">cart</button> -->
+				<button type="button" class="btn btn-sm" ng-click="goto('cart')"  ng-class="{'btn-info':show == 'cart'}">
+					Shopping Cart <span class="badge badge-light" style="background: red;">{{cartsize}}</span>
+				</button>
+			</h1>
+			<hr/>
+
+
+			<table class="table" ng-if="show=='productlist' ">
+				<tr>
+					<th>PRODUCT ID</th>
+					<th>PRODUCT NAME</th>
+					<th>PRICE</th>
+					<th>Quantity</th>
+					<th></th>
+				</tr>
+				<tr ng-repeat="(k,i) in productlist">
+					<td>{{i.id}}</td>
+					<td>{{i.name}}</td>
+					<td>{{i.price}}</td>
+					<td>
+						<button ng-click="minus(i)" class="btn btn-sm btn-default">-</button>
+						<!-- <input type="number" ng-model="i.num"> -->
+						{{i.num}}
+						<button ng-click="add(i)" class="btn btn-sm btn-default">+</button>
+					</td>
+					<td>
+						<button ng-click="addTocart(i)" class="btn btn-sm btn-default">add to cart</button>
+					</td>
+				</tr>
+			</table>
+
+			<br/>
+
+			<div class="col-12">
+				<div ng-if="show=='cart' ">
+					<label>PROMO CODE:</label>
+					<input type="text" ng-model="model.promocode">
+					<button ng-click="apply()" class="btn btn-sm btn-default">Apply</button>
+				</div>
+				<hr/>
+
+				 <button ng-if="show=='cart' " ng-click="removecart()" class="btn btn-sm btn-default">Remove All</button>
+			</div>
+
+			<table class="table" ng-if="show=='cart' ">
+				<tr>
+					<th>PRODUCT ID</th>
+					<th>PRODUCT NAME</th>
+					<th>PRICE</th>
+					<th>Quantity</th>
+					<th></th>
+				</tr>
+				<tr ng-repeat="(k,i) in cartlist">
+					<td>{{i.id}}</td>
+					<td>{{i.name}}</td>
+					<td>{{i.price}}</td>
+					<td>
+						<button ng-click="minus(i)" class="btn btn-sm btn-default">-</button>
+						{{i.num}}
+						<button ng-click="add(i)" class="btn btn-sm btn-default">+</button>
+					</td>
+				</tr>
+
+				<tr>
+					<th></th>
+					<th></th>
+					<th></th>
+					<th>
+						<div>{{ori}}</div>
+						<div ng-if="applied">-{{minus_number}} ({{applied_code}}) <button ng-click="remvoecode()" class="btn btn-sm btn-default">x</button></div>
+						<hr ng-if="applied" />
+						<div ng-if="applied">{{sum}}</div>
+					</th>
+					<th></th>
+				</tr>
+			</table>
+
+
+			<table class="table" ng-if="show=='cart' ">
+				<tr>
+					<th>PROMO CODE </th>
+					<th>DESCRIPTION</th>
+				</tr>
+
+				<tr ng-repeat="(k,i) in promocodelist">
+					<td>{{i.id}}</td>
+					<td>{{i.des}}</td>
+				</tr>
+			</table>
+
+
+		</div>
+	</body>
+</html>
